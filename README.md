@@ -18,6 +18,7 @@ From this project I want to learn or get better at the following
 
 ### Technologies to be used
 - Python3
-- Python libraries that fit my project
+- Tkinter
+- Other python libraries
 - Facebook Graphi API
 - Git
