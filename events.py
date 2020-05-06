@@ -5,6 +5,7 @@ import urllib
 import json
 from PIL import ImageTk, Image
 import datetime as dt
+from operator import attrgetter
 
 def formatEventDateTime(datetime):
     datetime = datetime.replace('T', '')
@@ -18,40 +19,55 @@ def storeProfilePictureLocally(pic):
     picUrl = pic
     urllib.request.urlretrieve(picUrl, r'images\ProfilePicture.png')
 
-def fetchFromGraphAPI(event):
-    token = {'EAAJyBpwkDxMBAPya4bkoyRWZAdHXlniaaXDbIfwwiWBh30yYg5cf0y5yoR46GtYIW9rZBOkT61spVjpj4pv4te6ffzc2iZAJW6HyPsFmp08gbcmg3xFx9Uql1LC64PGMME1fRd9grKcXm7nlsoeLIW3HSPtqubYnyGszvkAJtZCUUTnXdNNodoZAE052ycYALqj6tPXN1uAZDZD'}
+def generateArrayOfEvents(events, profileObj):
+    numberOfEvents = len(profileObj['events']['data'])
+    for e in range(numberOfEvents):
+        try:
+            cut = slice(-8)
+            event = {
+                'eventName': profileObj['events']['data'][e]['name'],
+                'eventPlace': profileObj['events']['data'][e]['place']['name'],
+                'startTime': profileObj['events']['data'][e]['start_time'][cut],
+            }
+            keys = profileObj['events']['data'][e].keys()
+
+            if 'end_time' in keys:
+                event.update({'endTime': profileObj['events']['data'][e]['end_time'][cut]})
+                eventEnds = formatEventDateTime(event['endTime'])
+                eventStarts = formatEventDateTime(event['startTime'])
+                event.update([('eventStarts', eventStarts), ('eventEnds', eventEnds)])
+                del event['endTime']
+            else:
+                event.update({'endTime': 'Not Available'})
+                eventStarts = formatEventDateTime(event['startTime'])
+                event.update([('eventStarts', eventStarts)])
+
+            del event['startTime']
+            events.append(event)
+        except UnicodeEncodeError:
+            print('There was an error encoding the facebook event!')
+            
+    return events
+
+def fetchFromGraphAPI(events):
+    token = {'EAAJyBpwkDxMBAJFu7XLn7z1v9QjTXwCDZClTx8oLXlaO9twHXZAUECWxGVOPNgdtJFEQi5SseGQknrZB0RmGDLa5n4sejIuwNT7mxAV1ZCZCugjwO0WllMHsAMtf4kQ7OpCBYmdQ5kHf4JZCWBausgfgUGRnwr8ZBgptyprHMmHtQc5ZA7sOTmwVI8qIhZCx03THtu3p5etE5PiQWjTB7EajV8OpG06wOPriXSdSVuEAo4wZDZD'}
     graph = facebook.GraphAPI(token)
 
     profile = graph.get_object('me', fields ='picture,events')
 
     profilePicture = profile['picture']['data']['url']
     storeProfilePictureLocally(profilePicture)
-    try:
-        cut = slice(-8)
-        #print(json.dumps(profile, indent=4))
-        event = {
-            'eventName': profile['events']['data'][0]['name'],
-            'eventPlace': profile['events']['data'][0]['place']['name'],
-            'startTime': profile['events']['data'][0]['start_time'][cut],
-            'endTime': profile['events']['data'][0]['end_time'][cut]
-        }
-        eventStarts = formatEventDateTime(event['startTime'])
-        eventEnds = formatEventDateTime(event['endTime'])
-        event.update([('eventStarts', eventStarts), ('eventEnds', eventEnds)])
-        del event['startTime']
-        del event['endTime']
-    except UnicodeEncodeError:
-        print('There was an error encoding the facebook event!')  
-
-    return event 
     
-def tkinter(event):
-    print(event)
-    #Getting the data from facebook profile
-    #fetchFromGraphAPI()
+    return generateArrayOfEvents(events, profile)
+
+def tkinter(events):
+    #print(events)
     #Set initial scale of the app
     HEIGHT = 600
     WIDTH = 350
+    heightOfEventFrame = (HEIGHT / len(events)) / 1000
+    relYofEventFrame = 0.08
+    print(heightOfEventFrame)
     #Initializing tkinter
     root = tk.Tk()
 
@@ -68,18 +84,21 @@ def tkinter(event):
     profile_photo = tk.Label(headerFrame, image=image)
     profile_photo.place(relheight=1, relwidth=0.15)
 
-    eventFrame1 = tk.Frame(root, bg='#007599')
-    eventFrame1.place(relx=0, rely=0.08, relheight=0.19, relwidth=1)
+    for e in range(len(events)):
+        eventFrame = tk.Frame(root, bg='#007599')
+        eventFrame.place(relx=0, rely=relYofEventFrame, relheight=heightOfEventFrame, relwidth=1)
 
-    eventTitle = tk.Label(eventFrame1, text=event['eventName'], bg='#007599')
-    eventTitle.place(relheight=0.5, relwidth=1)
+        eventTitle = tk.Label(eventFrame, text=events[e]['eventName'], bg='#007599')
+        eventTitle.place(relheight=0.5, relwidth=1)
+
+        relYofEventFrame = relYofEventFrame + 0.077
     
     root.mainloop()
 
 def main():
-    event = {}
-    event = fetchFromGraphAPI(event)
-    tkinter(event)
+    events = []
+    events = fetchFromGraphAPI(events)
+    tkinter(events)
 
 if __name__ == "__main__":
     main()
